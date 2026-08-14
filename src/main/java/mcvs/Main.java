@@ -53,7 +53,8 @@ public final class Main {
                 //new GameSpec("Go9x9_classic", "Go.lud", List.of("Board Size/9x9")),
                 //new GameSpec("Go9x9_connected", "Go.lud", List.of("Board Size/9x9")),
                 //new GameSpec("Go13x13_classic", "Go.lud", List.of("Board Size/13x13")),
-                new GameSpec("Go13x13_connected", "Go.lud", List.of("Board Size/13x13"))
+                //new GameSpec("Go13x13_connected", "Go.lud", List.of("Board Size/13x13"))
+                new GameSpec("Surakarta", "Surakarta.lud", List.of())
             );
 
         final List<AIFactory> aiFactories = List.of(
