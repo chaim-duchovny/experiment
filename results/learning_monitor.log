@@ -3168,3 +3168,33 @@ Search concentration       : 0.0  (lower = more focused)
 Phase: early / cold-start (expect near-UCT behaviour)
 ===========================================
 
+========== MCVS Learning Report ==========
+Games so far               : 130
+Early win-rate (first 300)  : 0.262
+Recent win-rate (last 200)  : 0.262
+Avg SimWin on played moves : 0.000
+Search concentration       : 0.0  (lower = more focused)
+-------------------------------------------
+Phase: early / cold-start (expect near-UCT behaviour)
+===========================================
+
+========== MCVS Learning Report ==========
+Games so far               : 140
+Early win-rate (first 300)  : 0.250
+Recent win-rate (last 200)  : 0.250
+Avg SimWin on played moves : 0.000
+Search concentration       : 0.0  (lower = more focused)
+-------------------------------------------
+Phase: early / cold-start (expect near-UCT behaviour)
+===========================================
+
+========== MCVS Learning Report ==========
+Games so far               : 150
+Early win-rate (first 300)  : 0.247
+Recent win-rate (last 200)  : 0.247
+Avg SimWin on played moves : 0.000
+Search concentration       : 0.0  (lower = more focused)
+-------------------------------------------
+Phase: early / cold-start (expect near-UCT behaviour)
+===========================================
+
