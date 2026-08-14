@@ -1,0 +1,17 @@
+# MAST vs MCVS
+1. B1
+2. [[Swap:player1=2,player2=1,decision=true],[SetNextPlayer:player=2]]
+3. A3
+4. A1
+5. C2
+6. C3
+7. C1
+8. E4
+9. B5
+10. B2
+11. D4
+12. D3
+13. F4
+14. F5
+15. G6
+16. G5

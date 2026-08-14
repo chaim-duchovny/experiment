@@ -1,0 +1,26 @@
+# UCT vs MCVS
+1. B2
+2. [[Swap:player1=2,player2=1,decision=true],[SetNextPlayer:player=2]]
+3. E5
+4. D3
+5. E3
+6. E4
+7. F5
+8. F4
+9. G5
+10. C2
+11. A1
+12. G4
+13. A2
+14. C5
+15. D6
+16. B3
+17. A3
+18. A5
+19. B4
+20. B5
+21. C4
+22. D7
+23. D5
+24. D4
+25. E7

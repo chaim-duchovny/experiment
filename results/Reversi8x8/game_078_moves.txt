@@ -1,0 +1,12 @@
+# MCVS vs MAST
+1. E3
+2. F3
+3. G3
+4. D3
+5. C3
+6. C4
+7. C5
+8. C6
+9. B7
+10. [Pass:decision=true,forced=true]
+11. [Pass:decision=true,forced=true]
