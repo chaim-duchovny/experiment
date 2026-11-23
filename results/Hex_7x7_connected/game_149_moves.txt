@@ -1,0 +1,19 @@
+# RAVE vs MCVS
+1. B5
+2. [[Swap:player1=2,player2=1,decision=true],[SetNextPlayer:player=2]]
+3. C5
+4. C4
+5. B3
+6. B4
+7. D2
+8. D4
+9. E4
+10. E5
+11. F6
+12. F5
+13. G5
+14. G6
+15. A3
+16. G7
+17. A4
+18. A5

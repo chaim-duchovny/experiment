@@ -1,0 +1,15 @@
+# UCT vs MCVS
+1. A12
+2. A11
+3. C6
+4. A1
+5. G1
+6. F2
+7. H11
+8. B1
+9. D9
+10. G10
+11. D10
+12. D6
+13. [Pass:decision=true]
+14. [Pass:decision=true]

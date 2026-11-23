@@ -1,0 +1,4 @@
+# MCVS vs MAST
+1. A1
+2. [Pass:decision=true]
+3. [Pass:decision=true]
