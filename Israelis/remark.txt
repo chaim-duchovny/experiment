@@ -1,0 +1,9 @@
+1.
+MCVS maintains two permanent background AtomicRunner threads that continuously generate and store weighted-matrix templates from the current root position into a shared vector database. This design deliberately eliminates the cold-start problem that affects pure online Monte-Carlo methods. The baseline agents (UCT, MAST, RAVE) receive no equivalent background knowledge accumulation. All agents are otherwise given identical thinking time (1 s) and the same maximum iteration budget per move.
+
+2.
+The key research question becomes:
+“Does accumulating vector templates from previous games provide a useful inductive bias that improves performance over strong stateless baselines under equal time?”
+
+3.
+The last game in the experiment I used the game of los almos chess. I used 2 atomic runners without caping their max iteration. I took 1 sec for every opponent. These changes due to the large branching factor of the game of los almos chess.
