@@ -1,0 +1,492 @@
+//-----------------------------------------------------------------------------
+// ISRAELIS HOLD'EM (israelis_holdem)
+//
+// NOTE: the equipment/rules/phases below still implement the Israelis draft (14 visible tiles).
+// The description and rules text in the metadata describe Israelis Hold'em (8 hidden tiles, random server deal).
+//-----------------------------------------------------------------------------
+
+(define "IfEnemyBlotIt" ("HittingCapture" (mapEntry (next))))
+(define "BarEmpty" (is Empty "Bar"))
+(define "Bar" (mapEntry (mover)))
+(define "AllPieceInHome" ("AllOwnedPiecesIn" (sites Mover)))
+(define "AllPieceEscaped" (no Pieces Mover))
+
+(define "V1" (if (= (var "TA") 0) (var "TB") (var "TA")))
+(define "C1" (if (= (var "TA") (var "TB")) (if (> (var "TA") 0) 4 0) 1))
+(define "Two" (and (> (var "TA") 0) (not (= (var "TA") (var "TB")))))
+(define "V2" (if ("Two") (var "TB") 0))
+(define "C2" (if ("Two") 1 0))
+(define "Rem1" (- ("C1") (var "U1")))
+(define "Rem2" (- ("C2") (var "U2")))
+(define "Pending" (and (= (var "Owner") (mover)) (> (+ ("Rem1") ("Rem2")) 0)))
+
+(define "Steps" (if (= #1 1) ("V1") ("V2")))
+(define "Avail" (> (if (= #1 1) ("Rem1") ("Rem2")) 0))
+(define "Nxt" ("NextSiteOnTrack" ("Steps" #1) from:#2))
+
+// Every played step marks the round as having progress (used by the zero-progress-round draw)
+(define "UseSlot"
+    (then
+        (and
+            (if (= #1 1)
+                (set Var "U1" (+ 1 (var "U1")))
+                (set Var "U2" (+ 1 (var "U2")))
+            )
+            (set Var "Prog" 1)
+        )
+    )
+)
+
+(define "MovePieceBy"
+    (move
+        (from #2)
+        (to
+            ("Nxt" #1 #2)
+            if:("NoEnemyOrOnlyOne" (to))
+            ("IfEnemyBlotIt")
+        )
+        ("UseSlot" #1)
+    )
+)
+
+(define "BarSlot"
+    (if ("Avail" #1)
+        ("MovePieceBy" #1 ("Bar"))
+    )
+)
+
+(define "RegSlot"
+    (if ("Avail" #1)
+        (forEach Site (sites Occupied by:Mover)
+            (if
+                (and
+                    ("IsNotOffBoard" ("Nxt" #1 (site)))
+                    (not ("IsEndTrack" ("Nxt" #1 (site))))
+                )
+                ("MovePieceBy" #1 (site))
+            )
+        )
+    )
+)
+
+(define "BearSlot"
+    (if ("Avail" #1)
+        (forEach Site (sites Occupied by:Mover)
+            (if
+                (and
+                    (is Occupied (site))
+                    ("IsNotOffBoard" ("Nxt" #1 (site)))
+                )
+                (if ("IsEndTrack" ("Nxt" #1 (site)))
+                    (move Remove (site) ("UseSlot" #1))
+                    ("MovePieceBy" #1 (site))
+                )
+            )
+            noMoveYet:(firstMoveOnTrack "Track" Mover
+                (if
+                    (and
+                        ("IsFriendAt" (site))
+                        (< ("Nxt" #1 (site)) 0)
+                    )
+                    (move Remove (site) ("UseSlot" #1))
+                )
+            )
+        )
+    )
+)
+
+(define "Gen"
+    (if "AllPieceInHome"
+        (or ("BearSlot" 1) ("BearSlot" 2))
+        (if "BarEmpty"
+            (or ("RegSlot" 1) ("RegSlot" 2))
+            (or ("BarSlot" 1) ("BarSlot" 2))
+        )
+    )
+)
+
+// A win comes first. A blocked step drops the rest of the tile: Owner 0 clears the pending
+// tile and the turn passes to the opponent.
+(define "Continue"
+    (if "AllPieceEscaped"
+        (set Var "Owner" 0)
+        (if "Pending"
+            (if (can Move ("Gen"))
+                (moveAgain)
+                (set Var "Owner" 0)
+            )
+            (set Var "Owner" 0)
+        )
+    )
+)
+
+(define "HandCount"
+    (count Sites in:(forEach (sites Hand #1) if:(is Occupied (site))))
+)
+(define "MyCount" ("HandCount" Mover))
+(define "OppCount" ("HandCount" Next))
+
+(define "TakeFree"
+    (forEach Site #1
+        (if (is Occupied (site))
+            (move
+                (from (site))
+                (to (handSite Mover ("MyCount")))
+            )
+        )
+    )
+)
+
+(define "TakeLocked"
+    (forEach Site #1
+        (if (is Occupied (site))
+            (move
+                (from (site))
+                (to (handSite Mover ("MyCount")))
+                (then (set Var #2 (mover)))
+            )
+        )
+    )
+)
+
+// Played tiles are moved (a real decision move) onto a visible shared "Played" hand, sites 82..109
+(define "PlayedCount"
+    (count Sites in:(forEach (sites {82..109}) if:(is Occupied (site))))
+)
+
+(define "ChooseTile"
+    (forEach Site (sites Hand Mover)
+        (if (is Occupied (site))
+            (move
+                (from (site))
+                (to (+ 79 (what at:(site))))
+                (then
+                    (set Var "TA" (mapEntry "TX" (what at:(last To)))
+                        (then
+                            (set Var "TB" (mapEntry "TY" (what at:(last To)))
+                                (then
+                                    (set Var "U1" 0
+                                        (then
+                                            (set Var "U2" 0
+                                                (then
+                                                    (set Var "Owner" (mover)
+                                                        (then
+                                                            // The tile stays visible in the "Played" rows.
+                                                            // Shown next to the player's name: tile (X,Y) -> X*10+Y, e.g. (1,2) -> 12, (0,5) -> 5
+                                                            (set Score Mover (+ (* 10 (var "TA")) (var "TB")))
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+(define "AllPlayed" (= 28 ("PlayedCount")))
+(define "AnyPlayed" (> ("PlayedCount") 0))
+
+(define "HandsEmpty" (and (= ("HandCount" P1) 0) (= ("HandCount" P2) 0)))
+
+(define "SharedEmpty"
+    (= 0 (count Sites in:(forEach (sites {26..53}) if:(is Occupied (site)))))
+)
+
+// Remove ONE played tile per move
+(define "ClearOne"
+    (forEach Site (sites {82..109})
+        (if (is Occupied (site))
+            (move Remove (site) (then (moveAgain)))
+        )
+    )
+)
+
+// Put the 28 tiles back on the shared hands (first add is the decision move)
+(define "Refill"
+    (move Add (piece "T000") (to 26)
+        (then
+            (and {
+                (add (piece "T110") (to 27))
+                (add (piece "T220") (to 28))
+                (add (piece "T330") (to 29))
+                (add (piece "T440") (to 30))
+                (add (piece "T550") (to 31))
+                (add (piece "T660") (to 32))
+                (add (piece "T010") (to 33))
+                (add (piece "T020") (to 34))
+                (add (piece "T030") (to 35))
+                (add (piece "T040") (to 36))
+                (add (piece "T050") (to 37))
+                (add (piece "T060") (to 38))
+                (add (piece "T120") (to 39))
+                (add (piece "T130") (to 40))
+                (add (piece "T140") (to 41))
+                (add (piece "T150") (to 42))
+                (add (piece "T160") (to 43))
+                (add (piece "T230") (to 44))
+                (add (piece "T240") (to 45))
+                (add (piece "T250") (to 46))
+                (add (piece "T260") (to 47))
+                (add (piece "T340") (to 48))
+                (add (piece "T350") (to 49))
+                (add (piece "T360") (to 50))
+                (add (piece "T450") (to 51))
+                (add (piece "T460") (to 52))
+                (add (piece "T560") (to 53))
+                (set Var "LA" 0)
+                (set Var "LB" 0)
+                (set Var "Owner" 0)
+                (set Var "Prog" 0)
+                (set Var "Rounds" (+ (var "Rounds") 1))
+                (moveAgain)
+            })
+        )
+    )
+)
+
+(game "Israelis Hold'em"
+    (players 2)
+    (equipment {
+        ("BackgammonBoard" ("BackgammonTracksWithBar" End))
+        
+        // Three visible shared hands = Group A, B, C
+        (hand Shared size:7)   // sites 26..32  = Group A (doubles)
+        (hand Shared size:6)   // sites 33..38  = Group B (zeros)
+        (hand Shared size:15)  // sites 39..53  = Group C (rest)
+        
+        (hand P1 size:14)
+        (hand P2 size:14)
+        (hand Shared size:7)   // sites 82..88   = Played, row A (doubles)
+        (hand Shared size:6)   // sites 89..94   = Played, row B (zeros)
+        (hand Shared size:15)  // sites 95..109  = Played, row C (rest)
+        
+        (regions P1 { 20..25 })
+        (regions P2 { 7..12 })
+        (map {(pair 1 6) (pair 2 19)})
+        
+        (map "TX" {
+            (pair 3 0) (pair 4 1) (pair 5 2) (pair 6 3) (pair 7 4) (pair 8 5) (pair 9 6)
+            (pair 10 0) (pair 11 0) (pair 12 0) (pair 13 0) (pair 14 0) (pair 15 0)
+            (pair 16 1) (pair 17 1) (pair 18 1) (pair 19 1) (pair 20 1)
+            (pair 21 2) (pair 22 2) (pair 23 2) (pair 24 2)
+            (pair 25 3) (pair 26 3) (pair 27 3)
+            (pair 28 4) (pair 29 4)
+            (pair 30 5)
+        })
+        (map "TY" {
+            (pair 3 0) (pair 4 1) (pair 5 2) (pair 6 3) (pair 7 4) (pair 8 5) (pair 9 6)
+            (pair 10 1) (pair 11 2) (pair 12 3) (pair 13 4) (pair 14 5) (pair 15 6)
+            (pair 16 2) (pair 17 3) (pair 18 4) (pair 19 5) (pair 20 6)
+            (pair 21 3) (pair 22 4) (pair 23 5) (pair 24 6)
+            (pair 25 4) (pair 26 5) (pair 27 6)
+            (pair 28 5) (pair 29 6)
+            (pair 30 6)
+        })
+        
+        (piece "Disc" Each)
+        
+        (piece "T00" Neutral) (piece "T11" Neutral) (piece "T22" Neutral) (piece "T33" Neutral)
+        (piece "T44" Neutral) (piece "T55" Neutral) (piece "T66" Neutral)
+        (piece "T01" Neutral) (piece "T02" Neutral) (piece "T03" Neutral)
+        (piece "T04" Neutral) (piece "T05" Neutral) (piece "T06" Neutral)
+        (piece "T12" Neutral) (piece "T13" Neutral) (piece "T14" Neutral) (piece "T15" Neutral)
+        (piece "T16" Neutral) (piece "T23" Neutral) (piece "T24" Neutral) (piece "T25" Neutral)
+        (piece "T26" Neutral) (piece "T34" Neutral) (piece "T35" Neutral) (piece "T36" Neutral)
+        (piece "T45" Neutral) (piece "T46" Neutral) (piece "T56" Neutral)
+        (piece "•" Neutral)
+    })
+    
+    (rules
+        (start {
+            (place Stack "Disc1" 0 count:5) (place Stack "Disc1" 12 count:2)
+            (place Stack "Disc1" 17 count:3) (place Stack "Disc1" 20 count:5)
+            (place Stack "Disc2" 4 count:3) (place Stack "Disc2" 7 count:5)
+            (place Stack "Disc2" 13 count:5) (place Stack "Disc2" 25 count:2)
+            
+            (place "T000" 26) (place "T110" 27) (place "T220" 28) (place "T330" 29)
+            (place "T440" 30) (place "T550" 31) (place "T660" 32)
+            (place "T010" 33) (place "T020" 34) (place "T030" 35)
+            (place "T040" 36) (place "T050" 37) (place "T060" 38)
+            (place "T120" 39) (place "T130" 40) (place "T140" 41) (place "T150" 42)
+            (place "T160" 43) (place "T230" 44) (place "T240" 45) (place "T250" 46)
+            (place "T260" 47) (place "T340" 48) (place "T350" 49) (place "T360" 50)
+            (place "T450" 51) (place "T460" 52) (place "T560" 53)
+        })
+        
+        phases:{
+            (phase "Selection"
+                (play
+                    (if "AnyPlayed"
+                        ("ClearOne")
+                        (if (and "HandsEmpty" "SharedEmpty")
+                        ("Refill")
+                        (if (< ("MyCount") 14)
+                            (or {
+                                (if
+                                    (or
+                                        (not (= (var "LA") (mover)))
+                                        (>= ("OppCount") 14)
+                                    )
+                                    ("TakeLocked" (sites {26..32}) "LA")
+                                )
+                                (if
+                                    (or
+                                        (not (= (var "LB") (mover)))
+                                        (>= ("OppCount") 14)
+                                    )
+                                    ("TakeLocked" (sites {33..38}) "LB")
+                                )
+                                ("TakeFree" (sites {39..53}))
+                            })
+                        )
+                        )
+                    )
+                )
+                (nextPhase
+                    (and (= ("HandCount" P1) 14) (= ("HandCount" P2) 14))
+                    "Playing"
+                )
+            )
+            
+            (phase "Playing"
+                (play
+                    (if "Pending"
+                        ("Gen")
+                        ("ChooseTile")
+                        (then ("Continue"))
+                    )
+                )
+                (nextPhase ("AllPlayed") "Selection")
+            )
+        }
+        
+        (end {
+            (if ("AllPieceEscaped")
+                (result Mover Win)
+            )
+            // Draw: the last tile of a round is done and no step was played in the whole round,
+            // or the 300-round safety cap is reached (Rounds counts the rounds started before this one)
+            (if
+                (and {
+                    ("AllPlayed")
+                    (= (var "Owner") 0)
+                    (or (= (var "Prog") 0) (>= (var "Rounds") 299))
+                })
+                (result Draw)
+            )
+        })
+    )
+)
+
+(metadata
+    (info
+        {
+        (description "Israelis Hold'em is a backgammon variant in which the dice are replaced by a double-six domino set, and the tiles are dealt face-down at random instead of being drafted. Each deal starts with all 28 tiles; the server deals 8 secret tiles to each player and the other 12 tiles stay unused and secret. The tiles are split in three groups (A = the 7 doubles, B = the 6 zero tiles (0,1)..(0,6), C = the other 15 tiles) that only matter for the deal. Players then play one tile per turn from their own hidden hand.")
+        (rules "Standard backgammon board and starting position. DEAL: every deal starts with all 28 tiles. The tiles are dealt at random by the server, one tile at a time, alternating, White first, until each player holds 8 tiles. No player picks tiles. You see only your own tiles; the opponent's tiles and the 12 undealt tiles stay secret. The board, the bar, the checkers borne off, the hand sizes, the tiles already played in the current deal, the tile being played and the result are public. GROUP RULE: A = the doubles, B = (0,1)..(0,6), C = all the other tiles. After a player is dealt a tile from A (or B), that player cannot be dealt another tile from that group until the opponent has been dealt one from it, or the opponent already has 8 tiles. Each tile dealt is chosen uniformly among the tiles allowed at that moment. The 12 tiles that are not dealt stay unused for that deal. PLAY: White starts the play phase of every deal. On your turn play exactly one tile from your hand: X+Y (both > 0) = a normal backgammon move of X and of Y, in either order; a double X+X (X > 0) is played four times, as in backgammon; 0+X = a single move of X; 0-0 = pass (it is not a draw of a new tile). All usual backgammon rules for moving, hitting, the bar and bearing off apply. The first player to bear off all 15 checkers wins at once, even if steps of the tile are still unplayed (this is checked before anything else). A player plays as many steps of the chosen tile as legally possible, in order; blocked steps are dropped. If a step cannot be played (for example a checker on the bar whose entry point is blocked), the remaining steps of that tile are lost and the turn passes to the opponent; steps already played stay played. If no step can be played, the tile is simply used up and the turn passes. There is no must-play-the-larger-number rule. NEW DEAL: when all 16 dealt tiles (8 per player) have been played, all 28 tiles are reshuffled, the group locks are reset and 8 tiles are dealt to each player again. The board stays exactly as it is. DRAW: the game is drawn only if a whole round (all 16 dealt tiles played, then a new deal) passes in which neither player played a single step, or, as a safety net, after 300 rounds.")
+        (source "Based on Backgammon.lud by Eric Piette (Ludii).")
+        (id "76")
+        (version "1.3.26")
+        (classification "board/race/escape")
+        (credit "Eric Piette (Backgammon); Israelis variant adaptation")
+        }
+    )
+    
+    (graphics {
+        (board Style backgammon)
+        (stackType Backgammon)
+        (board Placement scale:0.5)
+        (piece Rename piece:"•0" "disc")
+        (piece Scale "T000" 1.0)
+        (piece Scale "T110" 1.0)
+        (piece Scale "T220" 1.0)
+        (piece Scale "T330" 1.0)
+        (piece Scale "T440" 1.0)
+        (piece Scale "T550" 1.0)
+        (piece Scale "T660" 1.0)
+        (piece Scale "T010" 1.0)
+        (piece Scale "T020" 1.0)
+        (piece Scale "T030" 1.0)
+        (piece Scale "T040" 1.0)
+        (piece Scale "T050" 1.0)
+        (piece Scale "T060" 1.0)
+        (piece Scale "T120" 1.0)
+        (piece Scale "T130" 1.0)
+        (piece Scale "T140" 1.0)
+        (piece Scale "T150" 1.0)
+        (piece Scale "T160" 1.0)
+        (piece Scale "T230" 1.0)
+        (piece Scale "T240" 1.0)
+        (piece Scale "T250" 1.0)
+        (piece Scale "T260" 1.0)
+        (piece Scale "T340" 1.0)
+        (piece Scale "T350" 1.0)
+        (piece Scale "T360" 1.0)
+        (piece Scale "T450" 1.0)
+        (piece Scale "T460" 1.0)
+        (piece Scale "T560" 1.0)
+        // Tile label drawn as real text (x,y) with Foreground text:; the default one-letter name label is blanked with Rename
+        (piece Rename piece:"T000" " ")
+        (piece Foreground "T000" text:"(0,0)" scale:0.5)
+        (piece Rename piece:"T110" " ")
+        (piece Foreground "T110" text:"(1,1)" scale:0.5)
+        (piece Rename piece:"T220" " ")
+        (piece Foreground "T220" text:"(2,2)" scale:0.5)
+        (piece Rename piece:"T330" " ")
+        (piece Foreground "T330" text:"(3,3)" scale:0.5)
+        (piece Rename piece:"T440" " ")
+        (piece Foreground "T440" text:"(4,4)" scale:0.5)
+        (piece Rename piece:"T550" " ")
+        (piece Foreground "T550" text:"(5,5)" scale:0.5)
+        (piece Rename piece:"T660" " ")
+        (piece Foreground "T660" text:"(6,6)" scale:0.5)
+        (piece Rename piece:"T010" " ")
+        (piece Foreground "T010" text:"(0,1)" scale:0.5)
+        (piece Rename piece:"T020" " ")
+        (piece Foreground "T020" text:"(0,2)" scale:0.5)
+        (piece Rename piece:"T030" " ")
+        (piece Foreground "T030" text:"(0,3)" scale:0.5)
+        (piece Rename piece:"T040" " ")
+        (piece Foreground "T040" text:"(0,4)" scale:0.5)
+        (piece Rename piece:"T050" " ")
+        (piece Foreground "T050" text:"(0,5)" scale:0.5)
+        (piece Rename piece:"T060" " ")
+        (piece Foreground "T060" text:"(0,6)" scale:0.5)
+        (piece Rename piece:"T120" " ")
+        (piece Foreground "T120" text:"(1,2)" scale:0.5)
+        (piece Rename piece:"T130" " ")
+        (piece Foreground "T130" text:"(1,3)" scale:0.5)
+        (piece Rename piece:"T140" " ")
+        (piece Foreground "T140" text:"(1,4)" scale:0.5)
+        (piece Rename piece:"T150" " ")
+        (piece Foreground "T150" text:"(1,5)" scale:0.5)
+        (piece Rename piece:"T160" " ")
+        (piece Foreground "T160" text:"(1,6)" scale:0.5)
+        (piece Rename piece:"T230" " ")
+        (piece Foreground "T230" text:"(2,3)" scale:0.5)
+        (piece Rename piece:"T240" " ")
+        (piece Foreground "T240" text:"(2,4)" scale:0.5)
+        (piece Rename piece:"T250" " ")
+        (piece Foreground "T250" text:"(2,5)" scale:0.5)
+        (piece Rename piece:"T260" " ")
+        (piece Foreground "T260" text:"(2,6)" scale:0.5)
+        (piece Rename piece:"T340" " ")
+        (piece Foreground "T340" text:"(3,4)" scale:0.5)
+        (piece Rename piece:"T350" " ")
+        (piece Foreground "T350" text:"(3,5)" scale:0.5)
+        (piece Rename piece:"T360" " ")
+        (piece Foreground "T360" text:"(3,6)" scale:0.5)
+        (piece Rename piece:"T450" " ")
+        (piece Foreground "T450" text:"(4,5)" scale:0.5)
+        (piece Rename piece:"T460" " ")
+        (piece Foreground "T460" text:"(4,6)" scale:0.5)
+        (piece Rename piece:"T560" " ")
+        (piece Foreground "T560" text:"(5,6)" scale:0.5)
+    })
+)
