@@ -1,8 +1,5 @@
 //-----------------------------------------------------------------------------
 // ISRAELIS HOLD'EM (israelis_holdem)
-//
-// NOTE: the equipment/rules/phases below still implement the Israelis draft (14 visible tiles).
-// The description and rules text in the metadata describe Israelis Hold'em (8 hidden tiles, random server deal).
 //-----------------------------------------------------------------------------
 
 (define "IfEnemyBlotIt" ("HittingCapture" (mapEntry (next))))
@@ -149,7 +146,7 @@
     )
 )
 
-// Played tiles are moved (a real decision move) onto a visible shared "Played" hand, sites 82..109
+// Played tiles are moved onto a visible shared "Played" hand, sites 82..109
 (define "PlayedCount"
     (count Sites in:(forEach (sites {82..109}) if:(is Occupied (site))))
 )
@@ -171,9 +168,10 @@
                                                 (then
                                                     (set Var "Owner" (mover)
                                                         (then
-                                                            // The tile stays visible in the "Played" rows.
-                                                            // Shown next to the player's name: tile (X,Y) -> X*10+Y, e.g. (1,2) -> 12, (0,5) -> 5
-                                                            (set Score Mover (+ (* 10 (var "TA")) (var "TB")))
+                                                            (and {
+                                                                (set Score Mover (+ (* 10 (var "TA")) (var "TB")))
+                                                                (moveAgain)
+                                                            })
                                                         )
                                                     )
                                                 )
@@ -208,7 +206,7 @@
     )
 )
 
-// Put the 28 tiles back on the shared hands (first add is the decision move)
+// Put the 28 tiles back on the shared hands
 (define "Refill"
     (move Add (piece "T000") (to 26)
         (then
@@ -371,8 +369,6 @@
             (if ("AllPieceEscaped")
                 (result Mover Win)
             )
-            // Draw: the last tile of a round is done and no step was played in the whole round,
-            // or the 300-round safety cap is reached (Rounds counts the rounds started before this one)
             (if
                 (and {
                     ("AllPlayed")
@@ -388,11 +384,11 @@
 (metadata
     (info
         {
-        (description "Israelis Hold'em is a backgammon variant in which the dice are replaced by a double-six domino set, and the tiles are dealt face-down at random instead of being drafted. Each deal starts with all 28 tiles; the server deals 8 secret tiles to each player and the other 12 tiles stay unused and secret. The tiles are split in three groups (A = the 7 doubles, B = the 6 zero tiles (0,1)..(0,6), C = the other 15 tiles) that only matter for the deal. Players then play one tile per turn from their own hidden hand.")
-        (rules "Standard backgammon board and starting position. DEAL: every deal starts with all 28 tiles. The tiles are dealt at random by the server, one tile at a time, alternating, White first, until each player holds 8 tiles. No player picks tiles. You see only your own tiles; the opponent's tiles and the 12 undealt tiles stay secret. The board, the bar, the checkers borne off, the hand sizes, the tiles already played in the current deal, the tile being played and the result are public. GROUP RULE: A = the doubles, B = (0,1)..(0,6), C = all the other tiles. After a player is dealt a tile from A (or B), that player cannot be dealt another tile from that group until the opponent has been dealt one from it, or the opponent already has 8 tiles. Each tile dealt is chosen uniformly among the tiles allowed at that moment. The 12 tiles that are not dealt stay unused for that deal. PLAY: White starts the play phase of every deal. On your turn play exactly one tile from your hand: X+Y (both > 0) = a normal backgammon move of X and of Y, in either order; a double X+X (X > 0) is played four times, as in backgammon; 0+X = a single move of X; 0-0 = pass (it is not a draw of a new tile). All usual backgammon rules for moving, hitting, the bar and bearing off apply. The first player to bear off all 15 checkers wins at once, even if steps of the tile are still unplayed (this is checked before anything else). A player plays as many steps of the chosen tile as legally possible, in order; blocked steps are dropped. If a step cannot be played (for example a checker on the bar whose entry point is blocked), the remaining steps of that tile are lost and the turn passes to the opponent; steps already played stay played. If no step can be played, the tile is simply used up and the turn passes. There is no must-play-the-larger-number rule. NEW DEAL: when all 16 dealt tiles (8 per player) have been played, all 28 tiles are reshuffled, the group locks are reset and 8 tiles are dealt to each player again. The board stays exactly as it is. DRAW: the game is drawn only if a whole round (all 16 dealt tiles played, then a new deal) passes in which neither player played a single step, or, as a safety net, after 300 rounds.")
+        (description "Israelis Hold'em is a backgammon variant in which the dice are replaced by a double-six domino set, and the tiles are dealt face-down at random instead of being drafted. Each deal starts with all 28 tiles; the server deals 8 secret tiles to each player and the other 12 tiles stay unused and secret.")
+        (rules "Standard backgammon board and starting position. PLAY: White starts the play phase. Alternating turns where each player chooses one tile from their hand and plays its steps before passing the turn.")
         (source "Based on Backgammon.lud by Eric Piette (Ludii).")
         (id "76")
-        (version "1.3.26")
+        (version "1.3.27")
         (classification "board/race/escape")
         (credit "Eric Piette (Backgammon); Israelis variant adaptation")
         }
@@ -431,7 +427,7 @@
         (piece Scale "T450" 1.0)
         (piece Scale "T460" 1.0)
         (piece Scale "T560" 1.0)
-        // Tile label drawn as real text (x,y) with Foreground text:; the default one-letter name label is blanked with Rename
+        // Tile label drawn as real text (x,y) with Foreground text:
         (piece Rename piece:"T000" " ")
         (piece Foreground "T000" text:"(0,0)" scale:0.5)
         (piece Rename piece:"T110" " ")
