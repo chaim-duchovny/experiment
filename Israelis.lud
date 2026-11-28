@@ -23,10 +23,13 @@
 
 (define "UseSlot"
     (then
-        (if (= #1 1)
-            (set Var "U1" (+ 1 (var "U1")))
-            (set Var "U2" (+ 1 (var "U2")))
-        )
+        (and {
+            (if (= #1 1)
+                (set Var "U1" (+ 1 (var "U1")))
+                (set Var "U2" (+ 1 (var "U2")))
+            )
+            (set Var "StepsInRound" (+ 1 (var "StepsInRound")))
+        })
     )
 )
 
@@ -102,7 +105,7 @@
     (if "Pending"
         (if (can Move ("Gen"))
             (moveAgain)
-            (result Draw)          // Stalemate: no legal move with the chosen tile
+            (set Var "Owner" 0)          // Skip remaining unplayable steps for this tile
         )
         (set Var "Owner" 0)
     )
@@ -137,7 +140,7 @@
     )
 )
 
-// Played tiles are moved (a real decision move) onto a visible shared "Played" hand, sites 82..109
+// Played tiles are moved onto a visible shared "Played" hand, sites 82..109
 (define "PlayedCount"
     (count Sites in:(forEach (sites {82..109}) if:(is Occupied (site))))
 )
@@ -159,8 +162,6 @@
                                                 (then
                                                     (set Var "Owner" (mover)
                                                         (then
-                                                            // The tile stays visible in the "Played" rows.
-                                                            // Shown next to the player's name: tile (X,Y) -> X*10+Y, e.g. (1,2) -> 12, (0,5) -> 5
                                                             (set Score Mover (+ (* 10 (var "TA")) (var "TB")))
                                                         )
                                                     )
@@ -196,7 +197,7 @@
     )
 )
 
-// Put the 28 tiles back on the shared hands (first add is the decision move)
+// Put the 28 tiles back on the shared hands and alternate who drafts first
 (define "Refill"
     (move Add (piece "T000") (to 26)
         (then
@@ -231,6 +232,10 @@
                 (set Var "LA" 0)
                 (set Var "LB" 0)
                 (set Var "Owner" 0)
+                (set Var "RoundCount" (+ 1 (var "RoundCount")))
+                (set Var "StepsInRound" 0)
+                // Alternate first picker: if P1 (1) was first, make P2 (2) first, and vice versa
+                (set Var "FirstPicker" (if (= (var "FirstPicker") 2) 1 2))
                 (moveAgain)
             })
         )
@@ -304,6 +309,7 @@
             (place "T160" 43) (place "T230" 44) (place "T240" 45) (place "T250" 46)
             (place "T260" 47) (place "T340" 48) (place "T350" 49) (place "T360" 50)
             (place "T450" 51) (place "T460" 52) (place "T560" 53)
+            (set Var "FirstPicker" 1)  // P1 starts with first pick in game 1
         })
         
         phases:{
@@ -312,27 +318,32 @@
                     (if "AnyPlayed"
                         ("ClearOne")
                         (if (and "HandsEmpty" "SharedEmpty")
-                        ("Refill")
-                        (if (< ("MyCount") 14)
-                            (or {
-                                (if
-                                    (or
-                                        (not (= (var "LA") (mover)))
-                                        (>= ("OppCount") 14)
+                            ("Refill")
+                            (if (< ("MyCount") 14)
+                                (or {
+                                    (if
+                                        (or
+                                            (not (= (var "LA") (mover)))
+                                            (>= ("OppCount") 14)
+                                        )
+                                        ("TakeLocked" (sites {26..32}) "LA")
                                     )
-                                    ("TakeLocked" (sites {26..32}) "LA")
-                                )
-                                (if
-                                    (or
-                                        (not (= (var "LB") (mover)))
-                                        (>= ("OppCount") 14)
+                                    (if
+                                        (or
+                                            (not (= (var "LB") (mover)))
+                                            (>= ("OppCount") 14)
+                                        )
+                                        ("TakeLocked" (sites {33..38}) "LB")
                                     )
-                                    ("TakeLocked" (sites {33..38}) "LB")
-                                )
-                                ("TakeFree" (sites {39..53}))
-                            })
+                                    ("TakeFree" (sites {39..53}))
+                                })
+                            )
                         )
-                        )
+                    )
+                )
+                (init
+                    (if (= 0 (var "FirstPicker"))
+                        (set Var "FirstPicker" 1)
                     )
                 )
                 (nextPhase
@@ -357,7 +368,10 @@
             (if ("AllPieceEscaped")
                 (result Mover Win)
             )
-            (if (and (= (var "Owner") (mover)) (not (can Move ("Gen"))))
+            (if (and ("AllPlayed") (= (var "StepsInRound") 0))
+                (result Draw)
+            )
+            (if (and ("AllPlayed") (>= (var "RoundCount") 300))
                 (result Draw)
             )
         })
@@ -367,11 +381,11 @@
 (metadata
     (info
         {
-        (description "Israelis is a backgammon variant in which the dice are replaced by a double-six domino set. The 28 tiles are split in three visible groups (A = the 7 doubles, B = the 6 zero tiles, C = the other 15 tiles). Both players alternately draft 14 tiles, then play one tile per turn from their own (public) hand.")
-        (rules "Standard backgammon board and starting position. SELECTION: White and Black alternately take one tile at a time until each has 14. If you take from group A (or B), the opponent must take from the same group before you may take from it again. PLAY: White starts. On your turn play exactly one tile from your hand: X+Y (both > 0) = a normal backgammon move of X and of Y (a double X+X is played four times, as in backgammon); 0+X = a single move of X; 0-0 = pass. All usual backgammon rules for moving, hitting, the bar and bearing off apply. When both hands are empty a new Selection phase starts. The first player to bear off all 15 checkers wins. If a player has no legal move with the tile just played, the game ends in a draw.")
+        (description "Israelis is a backgammon variant in which the dice are replaced by a double-six domino set. The 28 tiles are split in three visible groups (A = 7 doubles, B = 6 zeros, C = 15 rest). Players alternately draft 14 tiles per round, with draft priority alternating after every refill.")
+        (rules "Standard backgammon board and starting position. SELECTION: Players alternately take one tile at a time until each has 14. The player who drafts first alternates after every tile refill. If you take from group A (or B), the opponent must take from the same group before you may take from it again. PLAY: White starts. On your turn play exactly one tile from your hand: X+Y = normal backgammon moves of X and Y (doubles played four times); 0+X = single move; 0-0 = pass. The game ends in a draw only if a full round (all 28 tiles played) passes during which no step at all is played by either player, or if the 300-round limit is reached.")
         (source "Based on Backgammon.lud by Eric Piette (Ludii).")
         (id "76")
-        (version "1.3.26")
+        (version "1.3.27")
         (classification "board/race/escape")
         (credit "Eric Piette (Backgammon); Israelis variant adaptation")
         }
@@ -410,7 +424,7 @@
         (piece Scale "T450" 1.0)
         (piece Scale "T460" 1.0)
         (piece Scale "T560" 1.0)
-        // Tile label drawn as real text (x,y) with Foreground text:; the default one-letter name label is blanked with Rename
+        // Tile label drawn as real text (x,y) with Foreground text:
         (piece Rename piece:"T000" " ")
         (piece Foreground "T000" text:"(0,0)" scale:0.5)
         (piece Rename piece:"T110" " ")
