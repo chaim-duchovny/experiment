@@ -46,6 +46,8 @@
     )
 )
 
+// Mandatory Entry: BarSlot is checked first. If pieces are on the bar, 
+// regular moves (RegSlot) are completely blocked until all bar pieces enter or are blocked.
 (define "BarSlot"
     (if ("Avail" #1)
         ("MovePieceBy" #1 ("Bar"))
@@ -151,9 +153,60 @@
     (count Sites in:(forEach (sites {82..109}) if:(is Occupied (site))))
 )
 
+// ---------------------------------------------------------------------------
+// MANDATORY BAR ENTRY WHEN CHOOSING A TILE
+// If the mover has a piece on the bar and at least one tile in hand can enter it
+// with one of its steps, only tiles that can enter may be chosen.
+// If no tile can enter, any tile may be chosen (and burned).
+// ---------------------------------------------------------------------------
+
+// One step of value #1 can enter from the bar (step > 0 and landing point not blocked)
+(define "EntryStepOK"
+    (if (> #1 0)
+        ("NoEnemyOrOnlyOne" ("NextSiteOnTrack" #1 from:("Bar")))
+        (= 1 0)
+    )
+)
+
+// Tile piece #1 can enter a bar piece.
+// 0-0 -> never. 0+X -> single step X. X+Y -> either X or Y. Doubles (X+X) -> X (played 4 times).
+(define "TileCanEnter"
+    (or
+        ("EntryStepOK"
+            (if (= (mapEntry "TX" #1) 0) (mapEntry "TY" #1) (mapEntry "TX" #1))
+        )
+        (and
+            (> (mapEntry "TX" #1) 0)
+            (not (= (mapEntry "TX" #1) (mapEntry "TY" #1)))
+            ("EntryStepOK" (mapEntry "TY" #1))
+        )
+    )
+)
+
+// At least one tile in the mover's hand can enter
+(define "AnyTileCanEnter"
+    (< 0
+        (count Sites in:(forEach (sites Hand Mover)
+            if:(and
+                (is Occupied (site))
+                ("TileCanEnter" (what at:(site)))
+            )
+        ))
+    )
+)
+
+// A tile may be chosen if the bar is empty, or no tile can enter, or this tile can enter
+(define "TileAllowed"
+    (or {
+        "BarEmpty"
+        (not ("AnyTileCanEnter"))
+        ("TileCanEnter" #1)
+    })
+)
+
 (define "ChooseTile"
     (forEach Site (sites Hand Mover)
-        (if (is Occupied (site))
+        (if (and (is Occupied (site)) ("TileAllowed" (what at:(site))))
             (move
                 (from (site))
                 (to (+ 79 (what at:(site))))
@@ -206,7 +259,7 @@
     )
 )
 
-// Put the 28 tiles back on the shared hands
+// Put the 28 tiles back on the shared hands and alternate starting player for next playing phase
 (define "Refill"
     (move Add (piece "T000") (to 26)
         (then
@@ -243,6 +296,11 @@
                 (set Var "Owner" 0)
                 (set Var "Prog" 0)
                 (set Var "Rounds" (+ (var "Rounds") 1))
+                // Alternate starting player for the Playing phase (Even rounds = P1 starts, Odd rounds = P2 starts)
+                (if (= 1 (% (var "Rounds") 2))
+                    (set NextPlayer P2)
+                    (set NextPlayer P1)
+                )
                 (moveAgain)
             })
         )
@@ -385,7 +443,7 @@
     (info
         {
         (description "Israelis Hold'em is a backgammon variant in which the dice are replaced by a double-six domino set, and the tiles are dealt face-down at random instead of being drafted. Each deal starts with all 28 tiles; the server deals 8 secret tiles to each player and the other 12 tiles stay unused and secret.")
-        (rules "Standard backgammon board and starting position. PLAY: White starts the play phase. Alternating turns where each player chooses one tile from their hand and plays its steps before passing the turn.")
+        (rules "Standard backgammon board and starting position. PLAY: White starts the first play phase, and the starting player alternates after each re-deal. Alternating turns where each player chooses one tile from their hand and plays its steps before passing the turn.")
         (source "Based on Backgammon.lud by Eric Piette (Ludii).")
         (id "76")
         (version "1.3.27")
